@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from rest_framework import serializers
 
 from books.serializers import BookBorrowingSerializer
@@ -9,7 +11,14 @@ class ReadBorrowingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Borrowing
-        fields = ("borrow_date", "expected_return_date", "book")
+        fields = (
+            "id",
+            "borrow_date",
+            "expected_return_date",
+            "book",
+            "actual_return_date"
+        )
+        # TODO: remove actual_return_date
 
 
 class CreateBorrowingSerializer(serializers.ModelSerializer):
@@ -25,6 +34,17 @@ class CreateBorrowingSerializer(serializers.ModelSerializer):
         if value.inventory == 0:
             raise serializers.ValidationError(
                 f'No "{value.title}" books left'
+            )
+        return value
+
+    def validate_expected_return_date(self, value):
+        """
+        Ensure that the user is unable to set
+        the return date to a time in the past.
+        """
+        if value < datetime.now().date():
+            raise serializers.ValidationError(
+                f"You can't set the return date before today"
             )
         return value
 
@@ -47,3 +67,7 @@ class BorrowingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Borrowing
         fields = "__all__"
+
+
+class EmptySerializer(serializers.Serializer):
+    pass

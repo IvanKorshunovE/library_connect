@@ -1,12 +1,18 @@
-from rest_framework import generics, mixins
+from datetime import datetime
+
+from rest_framework import generics, mixins, status
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.viewsets import ViewSetMixin
 
 from borrowings.models import Borrowing
 from borrowings.serializers import (
     BorrowingSerializer,
     CreateBorrowingSerializer,
-    ReadBorrowingSerializer
+    ReadBorrowingSerializer,
+    EmptySerializer
 )
 
 
@@ -53,8 +59,34 @@ class BorrowingViewSet(
             return CreateBorrowingSerializer
         elif self.action in ["list", "retrieve"]:
             return ReadBorrowingSerializer
+        elif self.action == "return_borrowing":
+            return EmptySerializer
 
         return BorrowingSerializer
+
+    @action(
+        methods=["POST"],
+        detail=True,
+        url_path="return",
+        permission_classes=[IsAuthenticated],
+    )
+    def return_borrowing(self, request, pk=None):
+        borrowing = self.get_object()
+        if borrowing.actual_return_date:
+            raise ValidationError(
+                f"The book {borrowing.book} has already been "
+                f"returned. You can't return the same "
+                f"borrowing twice"
+            )
+        borrowing.actual_return_date = datetime.now().date()
+        book = borrowing.book
+        book.inventory += 1
+        borrowing.save()
+        book.save()
+        return Response(
+            {"message": f"The book {book.title} has been returned."},
+            status=status.HTTP_200_OK
+        )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
