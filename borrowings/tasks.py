@@ -34,8 +34,8 @@ def send_overdue_borrowings():
                     borrowing.expected_return_date
                     - borrowing.borrow_date
             )
-            expected_price = book.daily_fee * time_difference.days
-            # expected_price = book.daily_fee
+            time_difference = time_difference.days + 1
+            expected_price = book.daily_fee * time_difference
 
             message = (
                 f"Borrowing ID: {borrowing.id},\n\n"
@@ -56,5 +56,5 @@ def send_overdue_borrowings():
             send_to_telegram(message)
     else:
         send_to_telegram(
-            f"date: {formatted_date}. No overdue books today"
+            f"No borrowings overdue today!"
         )
