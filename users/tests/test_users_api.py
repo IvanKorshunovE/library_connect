@@ -4,7 +4,11 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 from django.urls import reverse
-from users.serializers import UserSerializer
+from users.serializers import (
+    CreateUserSerializer,
+    UpdateUserSerializer
+)
+
 
 User = get_user_model()
 USER_CREATE_URL = reverse("users:user-create")
@@ -39,7 +43,7 @@ class UserViewSetTest(TestCase):
         user = User.objects.get(
             email=sample_user()["email"]
         )
-        serializer = UserSerializer(user)
+        serializer = CreateUserSerializer(user)
         self.assertEqual(
             serializer.data,
             response.data
@@ -63,7 +67,7 @@ class ManageUserViewTest(APITestCase):
         )
         self.assertEqual(
             response.data,
-            UserSerializer(self.user).data
+            UpdateUserSerializer(self.user).data
         )
 
     def test_update_user(self):
