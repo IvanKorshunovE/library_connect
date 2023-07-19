@@ -9,7 +9,9 @@ from borrowings.telegram_notification import send_to_telegram
 
 class BorrowingManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().filter(actual_return_date=None)
+        return super().get_queryset().filter(
+            actual_return_date=None
+        )
 
 
 class Borrowing(models.Model):
