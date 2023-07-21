@@ -116,12 +116,7 @@ class BorrowingViewSet(
         checkout_session = create_stripe_session(
             borrowing, request=self.request
         )
-        try:
-            return redirect(checkout_session.url)
-        except AmountTooLargeError as e:
-            raise AmountTooLargeError
-        except Exception as e:
-            raise e
+        return Response(checkout_session.url)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
