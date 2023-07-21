@@ -4,10 +4,13 @@ from rest_framework import serializers
 
 from books.serializers import BookBorrowingSerializer
 from borrowings.models import Borrowing
+from payments.helper_borrowing_function import create_stripe_session
+from payments.serializers import PaymentSerializer
 
 
 class ReadBorrowingSerializer(serializers.ModelSerializer):
     book = BookBorrowingSerializer(read_only=True)
+    payments = PaymentSerializer(read_only=True, many=True)
 
     class Meta:
         model = Borrowing
@@ -16,7 +19,8 @@ class ReadBorrowingSerializer(serializers.ModelSerializer):
             "borrow_date",
             "expected_return_date",
             "book",
-            "actual_return_date"
+            "actual_return_date",
+            "payments"
         )
         # TODO: remove actual_return_date
 
@@ -48,18 +52,25 @@ class CreateBorrowingSerializer(serializers.ModelSerializer):
             )
         return value
 
-    def create(self, validated_data):
-        """
-        If a new Borrowing instance created,
-        subtract one book from book.inventory.
-        """
-        borrowing = Borrowing.objects.create(
-            **validated_data
-        )
-        book = borrowing.book
-        book.inventory -= 1
-        book.save()
-        return borrowing
+    # def create(self, validated_data):
+    #     """
+    #     If a new Borrowing instance created,
+    #     subtract one book from book.inventory.
+    #     """
+    #     print("Beginning of create (inside serializer)")
+    #     borrowing = Borrowing.objects.create(
+    #         **validated_data
+    #     )
+    #     # Create a helper function, which will receive borrowing as a parameter, and create a new Stripe Session for it.
+    #     request = self.context.get("request")
+    #     create_stripe_session(borrowing, request)
+    #
+    #     book = borrowing.book
+    #     book.inventory -= 1
+    #     book.save()
+    #     print("End of create (inside serializer)")
+    #
+    #     return borrowing
 
 
 class BorrowingSerializer(serializers.ModelSerializer):

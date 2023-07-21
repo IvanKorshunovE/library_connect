@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.shortcuts import redirect
 from rest_framework import generics, mixins, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -7,12 +8,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSetMixin
 
+from borrowings.helper_functions import check_overdue
 from borrowings.models import Borrowing
 from borrowings.serializers import (
     BorrowingSerializer,
     CreateBorrowingSerializer,
     ReadBorrowingSerializer,
     EmptySerializer
+)
+from payments.helper_borrowing_function import (
+    create_stripe_session,
+    AmountTooLargeError
 )
 
 
@@ -78,15 +84,44 @@ class BorrowingViewSet(
                 f"returned. You can't return the same "
                 f"borrowing twice"
             )
+
+        overdue = check_overdue(borrowing, request)
+        if overdue:
+            try:
+                return redirect(overdue.url)
+            except AmountTooLargeError as e:
+                raise AmountTooLargeError
+            except Exception as e:
+                raise e
+
         borrowing.actual_return_date = datetime.now().date()
         book = borrowing.book
         book.inventory += 1
         borrowing.save()
         book.save()
         return Response(
-            {"message": f"The book {book.title} has been returned."},
+            {
+                "message":
+                    f"The book {book.title} has been returned."
+            },
             status=status.HTTP_200_OK
         )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        borrowing = serializer.instance
+        checkout_session = create_stripe_session(
+            borrowing, request=self.request
+        )
+        try:
+            return redirect(checkout_session.url)
+        except AmountTooLargeError as e:
+            raise AmountTooLargeError
+        except Exception as e:
+            raise e
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
