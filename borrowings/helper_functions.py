@@ -1,11 +1,27 @@
 from _decimal import Decimal
 from datetime import datetime
 
-
 from borrowings.models import Borrowing
 from payments.helper_borrowing_function import (
     create_stripe_session,
 )
+
+
+def make_today_actual_return_date(borrowing: Borrowing):
+    borrowing.actual_return_date = datetime.now().date()
+    borrowing.save()
+
+
+def decrease_book_inventory(borrowing: Borrowing):
+    book = borrowing.book
+    book.inventory -= 1
+    book.save()
+
+
+def increase_book_inventory(borrowing: Borrowing):
+    book = borrowing.book
+    book.inventory += 1
+    book.save()
 
 
 def fine_coefficient(expected_price: Decimal) -> Decimal:

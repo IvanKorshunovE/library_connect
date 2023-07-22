@@ -52,26 +52,6 @@ class CreateBorrowingSerializer(serializers.ModelSerializer):
             )
         return value
 
-    # def create(self, validated_data):
-    #     """
-    #     If a new Borrowing instance created,
-    #     subtract one book from book.inventory.
-    #     """
-    #     print("Beginning of create (inside serializer)")
-    #     borrowing = Borrowing.objects.create(
-    #         **validated_data
-    #     )
-    #     # Create a helper function, which will receive borrowing as a parameter, and create a new Stripe Session for it.
-    #     request = self.context.get("request")
-    #     create_stripe_session(borrowing, request)
-    #
-    #     book = borrowing.book
-    #     book.inventory -= 1
-    #     book.save()
-    #     print("End of create (inside serializer)")
-    #
-    #     return borrowing
-
 
 class BorrowingSerializer(serializers.ModelSerializer):
 

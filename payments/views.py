@@ -8,6 +8,10 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from borrowings.helper_functions import (
+    decrease_book_inventory,
+    increase_book_inventory, make_today_actual_return_date
+)
 from borrowings.models import Borrowing
 from borrowings.telegram_notification import send_to_telegram
 from payments.models import Payment
@@ -36,11 +40,11 @@ class SuccessView(APIView):
 
                 if is_fine_payment:
                     borrowing = payment.borrowing
-                    borrowing.actual_return_date = datetime.now().date()
                     book = borrowing.book
-                    book.inventory += 1
-                    borrowing.save()
-                    book.save()
+
+                    make_today_actual_return_date(borrowing)
+                    increase_book_inventory(borrowing)
+
                     return Response(
                         {
                             "message":
@@ -51,8 +55,9 @@ class SuccessView(APIView):
 
                 borrowing = payment.borrowing
                 book = payment.borrowing.book
-                book.inventory -= 1
-                book.save()
+
+                decrease_book_inventory(borrowing)
+
                 start_date = borrowing.borrow_date
                 end_date = borrowing.expected_return_date
                 formatted_start_date = start_date.strftime(

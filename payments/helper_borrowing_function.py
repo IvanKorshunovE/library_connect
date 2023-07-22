@@ -56,12 +56,14 @@ def create_stripe_session(
 ):
     if fine_decimal_price:
         is_fine_payment = True
+        payment_type = Payment.Type.FINE
         stripe_payment = calculate_stripe_price(
             fine_decimal_price
         )
         decimal_price = fine_decimal_price
     else:
         is_fine_payment = ""
+        payment_type = Payment.Type.PAYMENT
         decimal_price = calculate_borrowing_price(
             borrowing
         )
@@ -105,9 +107,9 @@ def create_stripe_session(
         )
         session_url = checkout_session.get("url")
         session_id = checkout_session.get("id")
-        payment = Payment.objects.create(
+        Payment.objects.create(
             status=Payment.Status.PENDING,
-            type=Payment.Type.PAYMENT,
+            type=payment_type,
             borrowing=borrowing,
             session_url=session_url,
             session_id=session_id,

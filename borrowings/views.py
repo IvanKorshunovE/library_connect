@@ -1,14 +1,16 @@
-from datetime import datetime
-
-from django.shortcuts import redirect
+from django.db import transaction
 from rest_framework import generics, mixins, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSetMixin
+from stripe.api_resources.checkout.session import Session
 
-from borrowings.helper_functions import check_overdue
+from borrowings.helper_functions import (
+    check_overdue,
+    increase_book_inventory, make_today_actual_return_date
+)
 from borrowings.models import Borrowing
 from borrowings.serializers import (
     BorrowingSerializer,
@@ -18,7 +20,7 @@ from borrowings.serializers import (
 )
 from payments.helper_borrowing_function import (
     create_stripe_session,
-    AmountTooLargeError
+    AmountTooLargeError, calculate_borrowing_price
 )
 
 
@@ -37,7 +39,13 @@ class BorrowingViewSet(
     mixins.RetrieveModelMixin,
     GenericViewSet
 ):
-    queryset = Borrowing.objects.select_related("book")
+    queryset = (
+        Borrowing.objects.select_related(
+            "book"
+        ).prefetch_related(
+            "payments"
+        )
+    )
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -78,7 +86,24 @@ class BorrowingViewSet(
     )
     def return_borrowing(self, request, pk=None):
         borrowing = self.get_object()
-        if borrowing.actual_return_date:
+
+        money_to_pay = calculate_borrowing_price(borrowing)
+        money_paid = borrowing.payments.filter(
+            money_to_pay=money_to_pay,
+            status="PAID"
+        )
+
+        if not money_paid:  # TODO: raise the exception or return a response?
+            return Response(
+                {
+                    "message":
+                        "The payment for this borrowing could not be found. "
+                        "Therefore, you cannot return a book that you have "
+                        "not yet paid for."
+                }
+            )
+
+        if borrowing.actual_return_date:  # TODO: raise the exception or return a response?
             raise ValidationError(
                 f"The book {borrowing.book} has already been "
                 f"returned. You can't return the same "
@@ -86,19 +111,30 @@ class BorrowingViewSet(
             )
 
         overdue = check_overdue(borrowing, request)
+
         if overdue:
+            data = {
+                "message": (
+                    "Successfully retrieved the checkout "
+                    "session URL for processing overdue payment"
+                ),
+                "checkout_session_url": overdue.url,
+            }
             try:
-                return redirect(overdue.url)
+                return Response(
+                    data,
+                    status=status.HTTP_302_FOUND
+                )
+                # TODO: redirect or send URL of payment session?
             except AmountTooLargeError as e:
                 raise AmountTooLargeError
             except Exception as e:
                 raise e
 
-        borrowing.actual_return_date = datetime.now().date()
+        make_today_actual_return_date(borrowing)
+        increase_book_inventory(borrowing)
+
         book = borrowing.book
-        book.inventory += 1
-        borrowing.save()
-        book.save()
         return Response(
             {
                 "message":
@@ -107,6 +143,7 @@ class BorrowingViewSet(
             status=status.HTTP_200_OK
         )
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -116,7 +153,21 @@ class BorrowingViewSet(
         checkout_session = create_stripe_session(
             borrowing, request=self.request
         )
-        return Response(checkout_session.url)
+        if isinstance(checkout_session, Session):
+            data = {
+                "message": "Checkout session URL retrieved successfully",
+                "checkout_session_url": checkout_session.url,
+            }
+            return Response(
+                data,
+                status=status.HTTP_302_FOUND
+            )
+        return Response(
+            {
+                "message":
+                    "Checkout session is not created"
+            }
+        )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
