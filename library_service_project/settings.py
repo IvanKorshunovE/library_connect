@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "rest_framework",
     "debug_toolbar",
+    # "django_nose",
     "borrowings",
     "payments",
     "books",
@@ -160,5 +161,11 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 YOUR_DOMAIN = "http://127.0.0.1:8000/"
-# SUCCESS_URL = "http://127.0.0.1:8000/api/payments/success"
-# CANCEL_URL = "http://127.0.0.1:8000/api/payments/cancel/"
+
+# TEST_RUNNER = "django_nose.NoseTestSuiteRunner"
+
+# Tell nose to measure coverage on the 'foo' and 'bar' apps
+# NOSE_ARGS = [
+#     "--with-coverage",
+#     "--cover-package=books,borrowings,payments,users",
+# ]

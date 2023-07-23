@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import stripe
 from django.conf import settings
 from django.http import HttpResponse
@@ -27,9 +25,10 @@ class SuccessView(APIView):
         session = stripe.checkout.Session.retrieve(
             session_id
         )
-
-        is_fine_payment = session["metadata"]["is_fine_payment"]
-        payment_status = session["payment_status"]
+        is_fine_payment = session.get(
+            "metadata"
+        ).get("is_fine_payment")
+        payment_status = session.get("payment_status")
         paid = payment_status == "paid"
 
         if paid:
@@ -102,8 +101,10 @@ class SuccessView(APIView):
         return Response(
             {
                 "message":
+                    f"Something went wrong"
                     f"Payment status: {payment_status}"
-            }
+            },
+            status=status.HTTP_204_NO_CONTENT
         )
 
 

@@ -14,11 +14,19 @@ from borrowings.tests.help_test_functions.help_test_functions import pay
 from payments.helper_borrowing_function import calculate_borrowing_price
 from payments.models import Payment
 
-
 User = get_user_model()
 TODAY_DATE = datetime.datetime.now().date()
 
 BORROWING_LIST_URL = reverse("borrowings:borrowing-list")
+BORROWING_NOT_FOUND_MESSAGE = (
+    "The payment for this borrowing could not be found. "
+    "Therefore, you cannot return a book that you have "
+    "not yet paid for."
+)
+OVERDUE_PAYMENT_MESSAGE = (
+    "Successfully retrieved the checkout session "
+    "URL for processing overdue payment"
+)
 
 
 def sample_user(**params):
@@ -44,6 +52,29 @@ def sample_book(**params):
     defaults.update(params)
 
     return defaults
+
+
+def return_url_(borrowing_id):
+    return reverse(
+        "borrowings:borrowing-return-borrowing",
+        args=[borrowing_id]
+    )
+
+
+def find_payment(checkout_session_url):
+    return Payment.objects.get(
+        session_url=checkout_session_url
+    )
+
+
+def retrieve_checkout_session_url(response):
+    return response.data.get(
+        "checkout_session_url"
+    )
+
+
+def book_returned_message(book_title):
+    return f"The book {book_title} has been returned."
 
 
 def sample_borrowing(**params):
@@ -100,6 +131,9 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
         self.client.force_authenticate(
             user=self.user
         )
+        self.book = Book.objects.create(
+            **sample_book()
+        )
 
     def test_list_borrowing(self):
         response = self.client.get(
@@ -111,23 +145,17 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
         )
 
     def test_create_borrowing(self):
-        book = sample_book(title="TEST")
-        book = Book.objects.create(**book)
+        book_title = self.book.title
         response = self.client.post(
             BORROWING_LIST_URL,
             data=sample_borrowing(
-                book=book.id
+                book=self.book.id
             ),
         )
         message = "Checkout session URL retrieved successfully"
         response_message = response.data.get("message")
-        checkout_session_url = response.data.get(
-            "checkout_session_url"
-        )
-        payment = Payment.objects.get(
-            session_url=checkout_session_url
-        )
-        book = payment.borrowing.book
+        checkout_session_url = retrieve_checkout_session_url(response)
+        payment = find_payment(checkout_session_url)
 
         self.assertEqual(
             response.status_code,
@@ -142,12 +170,12 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
             "PENDING"
         )
         self.assertEqual(
-            book.inventory,
+            self.book.inventory,
             10
         )
         self.assertEqual(
-            book.title,
-            "TEST"
+            self.book.title,
+            book_title
         )
 
     def test_return_borrowing_without_overdue(self):
@@ -160,47 +188,34 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
         is skipped) inventory is increased by one and
         actual_return_date is set for today.
         """
-        book = sample_book(title="Return")
-        book = Book.objects.create(**book)
-        book_starting_inventory = book.inventory
+        book_starting_inventory = self.book.inventory
         response = self.client.post(
             BORROWING_LIST_URL,
             data=sample_borrowing(
-                book=book.id
+                book=self.book.id
             ),
         )
-        checkout_session_url = response.data.get(
-            "checkout_session_url"
-        )
-        payment = Payment.objects.get(
-            session_url=checkout_session_url
-        )
+        checkout_session_url = retrieve_checkout_session_url(response)
+        payment = find_payment(checkout_session_url)
         borrowing = payment.borrowing
 
+        self.book.refresh_from_db()
         self.assertEqual(
-            book.inventory,
+            self.book.inventory,
             book_starting_inventory
         )
-        RETURN_URL = reverse(
-            "borrowings:borrowing-return-borrowing",
-            args=[borrowing.id]
+        return_url = return_url_(borrowing.id)
+        response = self.client.post(
+            return_url,
         )
 
-        response = self.client.post(
-            RETURN_URL,
-        )
-        message = (
-            "The payment for this borrowing could not be found. "
-            "Therefore, you cannot return a book that you have "
-            "not yet paid for."
-        )
-        book.refresh_from_db()
+        self.book.refresh_from_db()
         self.assertEqual(
-            response.data["message"],
-            message
+            response.data.get("message"),
+            BORROWING_NOT_FOUND_MESSAGE
         )
         self.assertEqual(
-            book.inventory,
+            self.book.inventory,
             book_starting_inventory
         )
         self.assertEqual(
@@ -211,12 +226,10 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
         pay(payment)
 
         response = self.client.post(
-            RETURN_URL,
+            return_url,
         )
-        message = (
-            f"The book {book.title} has been returned."
-        )
-        book.refresh_from_db()
+        message = book_returned_message(self.book.title)
+        self.book.refresh_from_db()
         borrowing.refresh_from_db()
 
         self.assertEqual(
@@ -224,7 +237,7 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
             message
         )
         self.assertEqual(
-            book.inventory,
+            self.book.inventory,
             book_starting_inventory + 1
         )
         self.assertEqual(
@@ -237,11 +250,7 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
         Check that if overdue, the stripe
         session.url should be returned
         """
-        book = sample_book(
-            title="Return with overdue",
-        )
-        book = Book.objects.create(**book)
-        book_starting_inventory = book.inventory
+        book_starting_inventory = self.book.inventory
         current_date = datetime.datetime.now().date()
         two_weeks_ago = current_date - datetime.timedelta(weeks=2)
         week_ago = current_date - datetime.timedelta(weeks=1)
@@ -249,15 +258,11 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
         response = self.client.post(
             BORROWING_LIST_URL,
             data=sample_borrowing(
-                book=book.id,
+                book=self.book.id,
             ),
         )
-        checkout_session_url = response.data.get(
-            "checkout_session_url"
-        )
-        payment = Payment.objects.get(
-            session_url=checkout_session_url
-        )
+        checkout_session_url = retrieve_checkout_session_url(response)
+        payment = find_payment(checkout_session_url)
 
         borrowing = payment.borrowing
         borrowing.borrow_date = week_ago
@@ -269,28 +274,22 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
         )
         pay(payment)
 
-        RETURN_URL = reverse(
-            "borrowings:borrowing-return-borrowing",
-            args=[borrowing.id]
-        )
+        return_url = return_url_(borrowing.id)
         response = self.client.post(
-            RETURN_URL,
+            return_url,
         )
-        message = (
-            "Successfully retrieved the checkout session "
-            "URL for processing overdue payment"
-        )
+        message = OVERDUE_PAYMENT_MESSAGE
         response_message = response.data.get(
             "message"
         )
-        book.refresh_from_db()
+        self.book.refresh_from_db()
         borrowing.refresh_from_db()
         self.assertEqual(
             response_message,
             message
         )
         self.assertEqual(
-            book.inventory,
+            self.book.inventory,
             book_starting_inventory
         )
         self.assertEqual(
