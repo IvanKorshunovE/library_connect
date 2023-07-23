@@ -27,9 +27,11 @@ class SuccessView(APIView):
         session = stripe.checkout.Session.retrieve(
             session_id
         )
+
         is_fine_payment = session["metadata"]["is_fine_payment"]
         payment_status = session["payment_status"]
         paid = payment_status == "paid"
+
         if paid:
             try:
                 payment = Payment.objects.get(
@@ -44,19 +46,23 @@ class SuccessView(APIView):
 
                     make_today_actual_return_date(borrowing)
                     increase_book_inventory(borrowing)
-
+                    headers = {
+                        "payment_type": "fine_payment"
+                    }
                     return Response(
                         {
                             "message":
                                 f"The book {book.title} has been returned."
                         },
-                        status=status.HTTP_200_OK
+                        status=status.HTTP_200_OK,
+                        headers=headers
                     )
 
                 borrowing = payment.borrowing
                 book = payment.borrowing.book
 
                 decrease_book_inventory(borrowing)
+                make_today_actual_return_date(borrowing)
 
                 start_date = borrowing.borrow_date
                 end_date = borrowing.expected_return_date
@@ -66,6 +72,9 @@ class SuccessView(APIView):
                 formatted_end_date = end_date.strftime(
                     "%d %B %Y"
                 )
+                headers = {
+                    "payment_type": "borrowing_payment"
+                }
                 return Response(
                     {
                         "message":
@@ -79,11 +88,17 @@ class SuccessView(APIView):
                             f"You can use your book staring from "
                             f"{formatted_start_date} to {formatted_end_date}.<br><br>"
                             f"Have a nice day!"
-                    }
+                    },
+                    status=status.HTTP_201_CREATED,
+                    headers=headers
                 )
             except Payment.DoesNotExist as e:
-                print("Payment does not exist")
-                raise e
+                return Response(
+                    {
+                        "message": "Payment does not exist"
+                    },
+                    status=status.HTTP_204_NO_CONTENT
+                )
         return Response(
             {
                 "message":
