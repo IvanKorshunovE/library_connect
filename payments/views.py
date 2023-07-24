@@ -2,19 +2,30 @@ import stripe
 from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework import status
+from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from borrowings.helper_functions import (
     decrease_book_inventory,
-    increase_book_inventory, make_today_actual_return_date
+    change_payment_status_to_paid,
+    finish_fine_payment,
+    payment_successful_response_message, get_payment,
 )
 from borrowings.models import Borrowing
 from borrowings.telegram_notification import send_to_telegram
+from borrowings.views import GenericViewSet
 from payments.models import Payment
+from payments.serializers import PaymentSerializer, PaymentListSerializer
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
+
+PAYMENT_DOES_NOT_EXIST_RESPONSE = Response(
+    {
+        "message": "Payment does not exist"
+    },
+    status=status.HTTP_204_NO_CONTENT
+)
 
 
 class SuccessView(APIView):
@@ -33,71 +44,22 @@ class SuccessView(APIView):
 
         if paid:
             try:
-                payment = Payment.objects.get(
-                    session_id=session_id
-                )
-                payment.status = "PAID"
-                payment.save()
-
-                if is_fine_payment:
-                    borrowing = payment.borrowing
-                    book = borrowing.book
-
-                    make_today_actual_return_date(borrowing)
-                    increase_book_inventory(borrowing)
-                    headers = {
-                        "payment_type": "fine_payment"
-                    }
-                    return Response(
-                        {
-                            "message":
-                                f"The book {book.title} has been returned."
-                        },
-                        status=status.HTTP_200_OK,
-                        headers=headers
-                    )
-
-                borrowing = payment.borrowing
-                book = payment.borrowing.book
-
-                decrease_book_inventory(borrowing)
-                make_today_actual_return_date(borrowing)
-
-                start_date = borrowing.borrow_date
-                end_date = borrowing.expected_return_date
-                formatted_start_date = start_date.strftime(
-                    "%d %B %Y"
-                )
-                formatted_end_date = end_date.strftime(
-                    "%d %B %Y"
-                )
-                headers = {
-                    "payment_type": "borrowing_payment"
-                }
-                return Response(
-                    {
-                        "message":
-                            f"Payment is successful.<br><br>"
-                            f"Thank you for your purchase!<br><br>"
-                            f"You can now show this confirmation to a library "
-                            f"staff and they will give you a book.<br><br>"
-                            f"Payment ID: {payment.id}<br>"
-                            f"Payment status: {payment.get_status_display()}<br><br>"
-                            f"Book: {book.title}\n"
-                            f"You can use your book staring from "
-                            f"{formatted_start_date} to {formatted_end_date}.<br><br>"
-                            f"Have a nice day!"
-                    },
-                    status=status.HTTP_201_CREATED,
-                    headers=headers
-                )
+                payment = get_payment(session_id)
             except Payment.DoesNotExist as e:
-                return Response(
-                    {
-                        "message": "Payment does not exist"
-                    },
-                    status=status.HTTP_204_NO_CONTENT
-                )
+                return PAYMENT_DOES_NOT_EXIST_RESPONSE
+            change_payment_status_to_paid(payment)
+            if is_fine_payment:
+                response = finish_fine_payment(payment)
+                return response
+
+            borrowing = payment.borrowing
+            decrease_book_inventory(borrowing)
+            response = payment_successful_response_message(
+                borrowing,
+                payment
+            )
+            return response
+
         return Response(
             {
                 "message":
@@ -106,6 +68,26 @@ class SuccessView(APIView):
             },
             status=status.HTTP_204_NO_CONTENT
         )
+
+
+class PaymentViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    GenericViewSet
+):
+    queryset = Payment.objects.select_related(
+        "borrowing__user",
+        "borrowing__book"
+    )
+    serializer_class = PaymentListSerializer
+
+    def get_queryset(self):
+        queryset = self.queryset
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(
+                borrowing__user=self.request.user
+            )
+        return queryset
 
 
 class CancelView(APIView):
@@ -123,6 +105,11 @@ class CancelView(APIView):
 
 @csrf_exempt
 def stripe_webhook(request):
+    """
+    This webhook does not do anything,
+    but it can extend functionality
+    if necessary
+    """
     payload = request.body
     sig_header = request.META["HTTP_STRIPE_SIGNATURE"]
     event = None

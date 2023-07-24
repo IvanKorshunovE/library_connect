@@ -296,3 +296,27 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
             borrowing.actual_return_date,
             None
         )
+
+    def test_not_allow_to_create_if_inventory_0(self):
+        """
+        Verify that borrowing is not allowed
+        for a book with an inventory of 0.
+        """
+        book = Book.objects.create(
+            **sample_book(
+                inventory=0
+            )
+        )
+        response = self.client.post(
+            BORROWING_LIST_URL,
+            data=sample_borrowing(
+                book=book.id,
+            ),
+        )
+        self.assertEqual(
+            response.data,
+            {
+                "book":
+                    [f'No "{book.title}" books left']
+            }
+        )

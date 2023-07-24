@@ -49,7 +49,7 @@ class BorrowingViewSet(
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        queryset = Borrowing.objects.select_related("book")
+        queryset = self.queryset
         if not self.request.user.is_staff:
             queryset = queryset.filter(user=self.request.user)
 
