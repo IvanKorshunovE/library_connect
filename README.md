@@ -21,7 +21,7 @@ The Library Service API is a comprehensive RESTful API designed for a library bo
 10. If you can't install redis locally, run the Redis server from docker: `docker run -d -p 6379:6379 redis`
 11. Run the Celery worker for task handling: `celery -A library_service_project worker -l INFO`
 12. Run Celery beat for task scheduling: `celery -A library_service_project beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler`
-13. Create a schedule for running sync in the DB.
+13. Create a schedule for running sync in the DB (additionally, the periodic task with crontab schedule (At 04:00 AM Europe/Kyiv) is already created).
 14. Run the app: `python manage.py runserver`
 
 ### API Documentation
