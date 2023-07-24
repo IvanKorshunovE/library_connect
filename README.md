@@ -16,11 +16,13 @@ The Library Service API is a comprehensive RESTful API designed for a library bo
 5. Install the required packages: `pip install -r requirements.txt`
 6. Create a `.env` file by copying the `.env.sample` file and populate it with the required values.
 7. Run migrations: `python manage.py migrate`
-8. Run the Redis server: `docker run -d -p 6379:6379 redis --- `
-9. Run the Celery worker for task handling: `celery -A library_service_project worker -l INFO`
-10. Run Celery beat for task scheduling: `celery -A library_service_project beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler`
-11. Create a schedule for running sync in the DB.
-12. Run the app: `python manage.py runserver`
+8. Create a test superuser, optionally create test books and borrowings
+9. Install and adjust redis to your local machine or do the next step
+10. If you can't install redis locally, run the Redis server from docker: `docker run -d -p 6379:6379 redis`
+11. Run the Celery worker for task handling: `celery -A library_service_project worker -l INFO`
+12. Run Celery beat for task scheduling: `celery -A library_service_project beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler`
+13. Create a schedule for running sync in the DB.
+14. Run the app: `python manage.py runserver`
 
 ### API Documentation
 
