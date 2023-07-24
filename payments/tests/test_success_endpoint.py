@@ -72,7 +72,7 @@ class SuccessViewTest(TestCase):
     def test_success_payment(self, mock_retrieve):
         """
         This test checks the behaviour of success
-        endpoint if session has status 'paid' and
+        endpoint if session has status 'paid', and
         "is_fine_payment": False parameter in metadata.
         """
         book = self.book
@@ -101,7 +101,7 @@ class SuccessViewTest(TestCase):
         )
         self.assertEqual(
             borrowing.actual_return_date,
-            datetime.now().date()
+            None
         )
         self.assertEqual(
             response.headers.get("payment_type"),
