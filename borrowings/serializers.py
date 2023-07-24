@@ -4,21 +4,24 @@ from rest_framework import serializers
 
 from books.serializers import BookBorrowingSerializer
 from borrowings.models import Borrowing
+from payments.serializers import PaymentSerializer
 
 
 class ReadBorrowingSerializer(serializers.ModelSerializer):
     book = BookBorrowingSerializer(read_only=True)
+    payments = PaymentSerializer(read_only=True, many=True)
 
     class Meta:
         model = Borrowing
         fields = (
             "id",
+            "user",
             "borrow_date",
             "expected_return_date",
             "book",
-            "actual_return_date"
+            "actual_return_date",
+            "payments"
         )
-        # TODO: remove actual_return_date
 
 
 class CreateBorrowingSerializer(serializers.ModelSerializer):
@@ -47,19 +50,6 @@ class CreateBorrowingSerializer(serializers.ModelSerializer):
                 f"You can't set the return date before today"
             )
         return value
-
-    def create(self, validated_data):
-        """
-        If a new Borrowing instance created,
-        subtract one book from book.inventory.
-        """
-        borrowing = Borrowing.objects.create(
-            **validated_data
-        )
-        book = borrowing.book
-        book.inventory -= 1
-        book.save()
-        return borrowing
 
 
 class BorrowingSerializer(serializers.ModelSerializer):
