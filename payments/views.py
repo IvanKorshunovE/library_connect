@@ -10,13 +10,13 @@ from borrowings.helper_functions import (
     decrease_book_inventory,
     change_payment_status_to_paid,
     finish_fine_payment,
-    payment_successful_response_message, get_payment,
+    payment_successful_response_message,
+    get_payment,
 )
 from borrowings.models import Borrowing
-from borrowings.telegram_notification import send_to_telegram
 from borrowings.views import GenericViewSet
 from payments.models import Payment
-from payments.serializers import PaymentSerializer, PaymentListSerializer
+from payments.serializers import PaymentListSerializer
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -134,5 +134,4 @@ def stripe_webhook(request):
         borrowing = Borrowing.objects.get(
             id=borrowing_id
         )
-        send_to_telegram("PURCHASED")
     return HttpResponse(status=200)

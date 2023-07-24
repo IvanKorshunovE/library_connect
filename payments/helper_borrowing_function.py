@@ -103,7 +103,10 @@ def create_stripe_session(
                     "?session_id={CHECKOUT_SESSION_ID}"
             )
             ,
-            cancel_url=cancel_url
+            cancel_url=(
+                    cancel_url +
+                    "?session_id={CHECKOUT_SESSION_ID}"
+            )
         )
         session_url = checkout_session.get("url")
         session_id = checkout_session.get("id")

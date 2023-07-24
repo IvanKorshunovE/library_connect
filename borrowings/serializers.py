@@ -4,7 +4,6 @@ from rest_framework import serializers
 
 from books.serializers import BookBorrowingSerializer
 from borrowings.models import Borrowing
-from payments.helper_borrowing_function import create_stripe_session
 from payments.serializers import PaymentSerializer
 
 
@@ -16,13 +15,13 @@ class ReadBorrowingSerializer(serializers.ModelSerializer):
         model = Borrowing
         fields = (
             "id",
+            "user",
             "borrow_date",
             "expected_return_date",
             "book",
             "actual_return_date",
             "payments"
         )
-        # TODO: remove actual_return_date
 
 
 class CreateBorrowingSerializer(serializers.ModelSerializer):

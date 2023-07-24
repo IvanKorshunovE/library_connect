@@ -1,4 +1,6 @@
 from django.db import transaction
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import generics, mixins, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -52,19 +54,17 @@ class BorrowingViewSet(
         queryset = self.queryset
         if not self.request.user.is_staff:
             queryset = queryset.filter(user=self.request.user)
-
-        is_active = self.request.query_params.get(
-            "is_active"
-        )
-        if is_active:
-            queryset = queryset.filter(actual_return_date=None)
-
-        if self.request.user.is_staff:
-            user_id = self.request.query_params.get(
-                "user_id"
-            )
+        else:
+            user_id = self.request.query_params.get("user_id")
             if user_id:
                 queryset = queryset.filter(user_id=user_id)
+
+        is_active = self.request.query_params.get("is_active")
+        if is_active:
+            is_active = is_active.lower() == "true"
+            queryset = queryset.filter(
+                actual_return_date=None
+            ) if is_active else queryset
 
         return queryset.distinct()
 
@@ -78,6 +78,32 @@ class BorrowingViewSet(
 
         return BorrowingSerializer
 
+    @extend_schema(
+        methods=["POST"],
+        description=(
+                "This endpoint facilitates the process of returning a "
+                "borrowed book. When called, it will perform the "
+                "following actions based on different scenarios:\n"
+                "1. If the book is overdue, the endpoint will return "
+                "a Stripe session URL for processing overdue payment, "
+                "and it will not alter the book's inventory.\n"
+                "2. If the borrowing has no associated payments, "
+                "the endpoint will respond with a message indicating "
+                "that the payment for the borrowing could not be found. "
+                "Additionally, it will not modify the book's inventory.\n"
+                "3. If the book has already been returned, the endpoint "
+                "will respond with a message stating that the book has "
+                "been returned, and it will not make any changes to the "
+                "database.\n"
+                "4. In the case of a successful book return, the "
+                "endpoint will set the return date for today and "
+                "increase the inventory count of the related book by 1, "
+                "reflecting the returned copy.\n\n"
+                "The endpoint aims to handle these scenarios while "
+                "ensuring accurate inventory management and appropriate "
+                "user communication during the book return process."
+        ),
+    )
     @action(
         methods=["POST"],
         detail=True,
@@ -93,7 +119,7 @@ class BorrowingViewSet(
             status="PAID"
         )
 
-        if not money_paid:  # TODO: raise the exception or return a response?
+        if not money_paid:
             return Response(
                 {
                     "message":
@@ -103,7 +129,7 @@ class BorrowingViewSet(
                 }
             )
 
-        if borrowing.actual_return_date:  # TODO: raise the exception or return a response?
+        if borrowing.actual_return_date:
             raise ValidationError(
                 f"The book {borrowing.book} has already been "
                 f"returned. You can't return the same "
@@ -125,7 +151,6 @@ class BorrowingViewSet(
                     data,
                     status=status.HTTP_302_FOUND
                 )
-                # TODO: redirect or send URL of payment session?
             except AmountTooLargeError as e:
                 raise AmountTooLargeError
             except Exception as e:
@@ -160,14 +185,36 @@ class BorrowingViewSet(
             }
             return Response(
                 data,
-                status=status.HTTP_302_FOUND
+                status=status.HTTP_302_FOUND,
+                headers=headers
             )
         return Response(
             {
                 "message":
                     "Checkout session is not created"
-            }
+            },
+            headers=headers
         )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="is_active",
+                type=OpenApiTypes.BOOL,
+                location=OpenApiParameter.QUERY,
+                description=(
+                        "Filter by active borrowings "
+                        "(where actual date is None)."
+                        "Type 'true' if you want to use"
+                        "this filter, otherwise leave it "
+                        "empty or type 'false'"
+                ),
+                required=False,
+            )
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
