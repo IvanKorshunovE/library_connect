@@ -30,6 +30,13 @@ PAYMENT_DOES_NOT_EXIST_RESPONSE = Response(
 
 class SuccessView(APIView):
     def get(self, request):
+        """
+        After a successful payment, the user is redirected to this endpoint.
+        If the payment status is 'paid', the book inventory will be
+        decreased by 1, and the payment status will be updated from
+        'pending' to 'paid'. In the case of fine payment,
+        the book inventory will be increased by 1.
+        """
         session_id = self.request.query_params.get(
             "session_id"
         )
@@ -92,6 +99,10 @@ class PaymentViewSet(
 
 class CancelView(APIView):
     def get(self, request):
+        """
+        After the canceled payment, the user is
+        redirected to this endpoint.
+        """
         return Response(
             {
                 "message":

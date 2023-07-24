@@ -103,6 +103,40 @@ class BorrowingViewSet(
                 "ensuring accurate inventory management and appropriate "
                 "user communication during the book return process."
         ),
+        responses={
+            status.HTTP_200_OK: {
+                "properties": {
+                    "message": {
+                        "description":
+                            "Message indicating that "
+                            "the book has been returned.",
+                    },
+                }
+            },
+            status.HTTP_302_FOUND: {
+                "properties": {
+                    "message": {
+                        "description":
+                            "Message indicating success "
+                            "in retrieving the checkout session URL.",
+                    },
+                    "checkout_session_url": {
+                        "description":
+                            "URL for the checkout session "
+                            "for overdue payment processing.",
+                    },
+                },
+            },
+            status.HTTP_400_BAD_REQUEST: {
+                "properties": {
+                    "message": {
+                        "description":
+                            "Error message indicating that payment "
+                            "for the borrowing could not be found.",
+                    },
+                },
+            },
+        },
     )
     @action(
         methods=["POST"],
@@ -126,7 +160,8 @@ class BorrowingViewSet(
                         "The payment for this borrowing could not be found. "
                         "Therefore, you cannot return a book that you have "
                         "not yet paid for."
-                }
+                },
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         if borrowing.actual_return_date:
