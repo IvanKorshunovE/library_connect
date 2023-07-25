@@ -60,7 +60,6 @@ class SuccessView(APIView):
             borrowing = payment.borrowing
             borrowing.book.decrease_book_inventory()
             response = payment_successful_response_message(
-                borrowing,
                 payment
             )
             return response

@@ -30,9 +30,9 @@ def finish_fine_payment(payment):
 
 
 def payment_successful_response_message(
-        borrowing,
         payment: Payment
 ):
+    borrowing = payment.borrowing
     book = borrowing.book
     start_date = borrowing.borrow_date
     end_date = borrowing.expected_return_date
