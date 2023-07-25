@@ -19,5 +19,13 @@ class Book(models.Model):
         decimal_places=2
     )
 
+    def decrease_book_inventory(self):
+        self.inventory -= 1
+        self.save()
+
+    def increase_book_inventory(self):
+        self.inventory += 1
+        self.save()
+
     def __str__(self):
         return self.title

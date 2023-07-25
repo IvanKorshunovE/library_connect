@@ -9,10 +9,6 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSetMixin
 from stripe.api_resources.checkout.session import Session
 
-from borrowings.helper_functions import (
-    check_overdue,
-    increase_book_inventory, make_today_actual_return_date
-)
 from borrowings.models import Borrowing
 from borrowings.serializers import (
     BorrowingSerializer,
@@ -22,7 +18,7 @@ from borrowings.serializers import (
 )
 from payments.helper_borrowing_function import (
     create_stripe_session,
-    AmountTooLargeError, calculate_borrowing_price
+    AmountTooLargeError,
 )
 
 
@@ -146,8 +142,7 @@ class BorrowingViewSet(
     )
     def return_borrowing(self, request, pk=None):
         borrowing = self.get_object()
-
-        money_to_pay = calculate_borrowing_price(borrowing)
+        money_to_pay = borrowing.calculate_borrowing_price()
         money_paid = borrowing.payments.filter(
             money_to_pay=money_to_pay,
             status="PAID"
@@ -171,7 +166,7 @@ class BorrowingViewSet(
                 f"borrowing twice"
             )
 
-        overdue = check_overdue(borrowing, request)
+        overdue = borrowing.check_overdue(request)
 
         if overdue:
             data = {
@@ -191,8 +186,8 @@ class BorrowingViewSet(
             except Exception as e:
                 raise e
 
-        make_today_actual_return_date(borrowing)
-        increase_book_inventory(borrowing)
+        borrowing.make_today_actual_return_date()
+        borrowing.book.increase_book_inventory()
 
         book = borrowing.book
         return Response(

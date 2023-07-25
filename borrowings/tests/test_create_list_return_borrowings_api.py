@@ -11,7 +11,6 @@ from django.urls import reverse
 
 from books.models import Book
 from borrowings.tests.help_test_functions.help_test_functions import pay
-from payments.helper_borrowing_function import calculate_borrowing_price
 from payments.models import Payment
 
 User = get_user_model()
@@ -269,9 +268,7 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
         borrowing.expected_return_date = two_weeks_ago
         borrowing.save()
 
-        payment.money_to_pay = calculate_borrowing_price(
-            borrowing
-        )
+        payment.money_to_pay = borrowing.calculate_borrowing_price()
         pay(payment)
 
         return_url = return_url_(borrowing.id)

@@ -3,8 +3,6 @@ from decimal import Decimal
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from borrowings.models import Borrowing
-
 
 class Payment(models.Model):
     class Status(models.TextChoices):
@@ -24,7 +22,7 @@ class Payment(models.Model):
         choices=Type.choices,
     )
     borrowing = models.ForeignKey(
-        Borrowing,
+        'borrowings.Borrowing',
         on_delete=models.CASCADE,
         related_name="payments"
     )
@@ -39,6 +37,10 @@ class Payment(models.Model):
         decimal_places=2,
         default=Decimal('0.00')
     )
+
+    def change_payment_status_to_paid(self):
+        self.status = "PAID"
+        self.save()
 
     def __str__(self):
         return (

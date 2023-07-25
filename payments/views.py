@@ -7,8 +7,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from borrowings.helper_functions import (
-    decrease_book_inventory,
-    change_payment_status_to_paid,
     finish_fine_payment,
     payment_successful_response_message,
     get_payment,
@@ -54,13 +52,13 @@ class SuccessView(APIView):
                 payment = get_payment(session_id)
             except Payment.DoesNotExist as e:
                 return PAYMENT_DOES_NOT_EXIST_RESPONSE
-            change_payment_status_to_paid(payment)
+            payment.change_payment_status_to_paid()
             if is_fine_payment:
                 response = finish_fine_payment(payment)
                 return response
 
             borrowing = payment.borrowing
-            decrease_book_inventory(borrowing)
+            borrowing.book.decrease_book_inventory()
             response = payment_successful_response_message(
                 borrowing,
                 payment

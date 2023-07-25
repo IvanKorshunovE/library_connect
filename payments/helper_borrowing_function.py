@@ -5,7 +5,6 @@ from rest_framework.exceptions import ValidationError
 from stripe.error import InvalidRequestError
 from rest_framework.reverse import reverse
 
-from borrowings.models import Borrowing
 from payments.models import Payment
 
 
@@ -15,25 +14,6 @@ class AmountTooLargeError(ValidationError):
         "transaction is too large."
     )
     default_code = "amount_too_large"
-
-
-def calculate_borrowing_price(
-        borrowing: Borrowing
-) -> Decimal:
-    """
-    Multiply difference between
-    borrowing date and return date
-     and calculate Decimal price
-    """
-    book = borrowing.book
-    daily_fee = book.daily_fee
-    time_difference = (
-            borrowing.expected_return_date
-            - borrowing.borrow_date
-    )
-    time_difference = time_difference.days + 1
-    expected_price = daily_fee * time_difference
-    return expected_price
 
 
 def calculate_stripe_price(
@@ -49,7 +29,7 @@ def calculate_stripe_price(
 
 
 def create_stripe_session(
-        borrowing: Borrowing,
+        borrowing,
         request,
         fine_decimal_price=None
 
@@ -64,9 +44,7 @@ def create_stripe_session(
     else:
         is_fine_payment = ""
         payment_type = Payment.Type.PAYMENT
-        decimal_price = calculate_borrowing_price(
-            borrowing
-        )
+        decimal_price = borrowing.calculate_borrowing_price()
         stripe_payment = calculate_stripe_price(
             decimal_price
         )
@@ -101,8 +79,7 @@ def create_stripe_session(
             success_url=(
                     success_url +
                     "?session_id={CHECKOUT_SESSION_ID}"
-            )
-            ,
+            ),
             cancel_url=(
                     cancel_url +
                     "?session_id={CHECKOUT_SESSION_ID}"
