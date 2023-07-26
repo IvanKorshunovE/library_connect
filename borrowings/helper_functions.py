@@ -1,7 +1,6 @@
 from _decimal import Decimal
 
 from rest_framework import status
-from rest_framework.response import Response
 
 from payments.models import Payment
 
@@ -19,14 +18,12 @@ def finish_fine_payment(payment):
     headers = {
         "payment_type": "fine_payment"
     }
-    return Response(
-        {
-            "message":
-                f"The book {book.title} has been returned."
-        },
-        status=status.HTTP_200_OK,
-        headers=headers
-    )
+    return {
+        "message":
+            f"The book {book.title} has been returned.",
+        "status": status.HTTP_200_OK,
+        "headers": headers
+    }
 
 
 def payment_successful_response_message(
@@ -45,23 +42,21 @@ def payment_successful_response_message(
     headers = {
         "payment_type": "borrowing_payment"
     }
-    return Response(
-        {
-            "message":
-                f"Payment is successful.<br><br>"
-                f"Thank you for your purchase!<br><br>"
-                f"You can now show this confirmation to a library "
-                f"staff and they will give you a book.<br><br>"
-                f"Payment ID: {payment.id}<br>"
-                f"Payment status: {payment.get_status_display()}<br><br>"
-                f"Book: {book.title}\n"
-                f"You can use your book staring from "
-                f"{formatted_start_date} to {formatted_end_date}.<br><br>"
-                f"Have a nice day!"
-        },
-        status=status.HTTP_201_CREATED,
-        headers=headers
-    )
+    return {
+        "message":
+            f"Payment is successful.<br><br>"
+            f"Thank you for your purchase!<br><br>"
+            f"You can now show this confirmation to a library "
+            f"staff and they will give you a book.<br><br>"
+            f"Payment ID: {payment.id}<br>"
+            f"Payment status: {payment.get_status_display()}<br><br>"
+            f"Book: {book.title}\n"
+            f"You can use your book staring from "
+            f"{formatted_start_date} to {formatted_end_date}.<br><br>"
+            f"Have a nice day!",
+        "status": status.HTTP_201_CREATED,
+        "headers": headers
+    }
 
 
 def get_payment(session_id):

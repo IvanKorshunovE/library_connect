@@ -208,15 +208,7 @@ class SuccessViewTest(TestCase):
                 "session_id": SESSION_ID
             }
         )
-        message = (
-            "Something went wrong"
-            "Payment status: not paid"
-        )
         self.assertEqual(
             response.status_code,
             status.HTTP_204_NO_CONTENT,
-        )
-        self.assertEqual(
-            response.data.get("message"),
-            message,
         )

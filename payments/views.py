@@ -6,15 +6,13 @@ from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from borrowings.helper_functions import (
-    finish_fine_payment,
-    payment_successful_response_message,
-    get_payment,
-)
 from borrowings.models import Borrowing
 from borrowings.views import GenericViewSet
 from payments.models import Payment
-from payments.serializers import PaymentListSerializer
+from payments.serializers import (
+    PaymentListSerializer,
+    PaymentSuccessSerializer
+)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -38,39 +36,20 @@ class SuccessView(APIView):
         session_id = self.request.query_params.get(
             "session_id"
         )
-        session = stripe.checkout.Session.retrieve(
-            session_id
+        context = {
+            "session_id": session_id
+        }
+        serializer = PaymentSuccessSerializer(
+            context=context
         )
-        is_fine_payment = session.get(
-            "metadata"
-        ).get("is_fine_payment")
-        payment_status = session.get("payment_status")
-        paid = payment_status == "paid"
-
-        if paid:
-            try:
-                payment = get_payment(session_id)
-            except Payment.DoesNotExist as e:
-                return PAYMENT_DOES_NOT_EXIST_RESPONSE
-            payment.change_payment_status_to_paid()
-            if is_fine_payment:
-                response = finish_fine_payment(payment)
-                return response
-
-            borrowing = payment.borrowing
-            borrowing.book.decrease_book_inventory()
-            response = payment_successful_response_message(
-                payment
-            )
-            return response
-
+        response_data = serializer.return_success_response()
+        message = response_data.get("message")
+        status_ = response_data.get("status")
+        headers = response_data.get("headers")
         return Response(
-            {
-                "message":
-                    f"Something went wrong"
-                    f"Payment status: {payment_status}"
-            },
-            status=status.HTTP_204_NO_CONTENT
+            message,
+            status=status_,
+            headers=headers
         )
 
 

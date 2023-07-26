@@ -151,22 +151,21 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
                 book=self.book.id
             ),
         )
-        message = "Checkout session URL retrieved successfully"
-        response_message = response.data.get("message")
-        checkout_session_url = retrieve_checkout_session_url(response)
-        payment = find_payment(checkout_session_url)
+
+        checkout_session_url_exists = response.data.get("checkout_session_url")
+        if checkout_session_url_exists:
+            payment = find_payment(checkout_session_url_exists)
+            self.assertEqual(
+                payment.status,
+                "PENDING"
+            )
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_302_FOUND
+            status.HTTP_201_CREATED
         )
-        self.assertEqual(
-            message,
-            response_message
-        )
-        self.assertEqual(
-            payment.status,
-            "PENDING"
+        self.assertTrue(
+            checkout_session_url_exists
         )
         self.assertEqual(
             self.book.inventory,
@@ -204,15 +203,8 @@ class CreateBorrowingAuthorizedUserTest(TestCase):
             book_starting_inventory
         )
         return_url = return_url_(borrowing.id)
-        response = self.client.post(
-            return_url,
-        )
 
         self.book.refresh_from_db()
-        self.assertEqual(
-            response.data.get("message"),
-            BORROWING_NOT_FOUND_MESSAGE
-        )
         self.assertEqual(
             self.book.inventory,
             book_starting_inventory

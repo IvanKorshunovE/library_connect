@@ -1,24 +1,17 @@
-from django.db import transaction
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import generics, mixins, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSetMixin
-from stripe.api_resources.checkout.session import Session
 
 from borrowings.models import Borrowing
 from borrowings.serializers import (
     BorrowingSerializer,
     CreateBorrowingSerializer,
     ReadBorrowingSerializer,
-    EmptySerializer
-)
-from payments.helper_borrowing_function import (
-    create_stripe_session,
-    AmountTooLargeError,
+    ReturnBorrowingSerializer
 )
 
 
@@ -46,7 +39,6 @@ class BorrowingViewSet(
     )
     permission_classes = [IsAuthenticated]
 
-
     def get_queryset(self):
         queryset = self.queryset
         if not self.request.user.is_staff:
@@ -71,7 +63,7 @@ class BorrowingViewSet(
         elif self.action in ["list", "retrieve"]:
             return ReadBorrowingSerializer
         elif self.action == "return_borrowing":
-            return EmptySerializer
+            return ReturnBorrowingSerializer
 
         return BorrowingSerializer
 
@@ -143,61 +135,15 @@ class BorrowingViewSet(
     )
     def return_borrowing(self, request, pk=None):
         borrowing = self.get_object()
-        money_to_pay = borrowing.calculate_borrowing_price()
-        money_paid = borrowing.payments.filter(
-            money_to_pay=money_to_pay,
-            status="PAID"
+        context = {
+            "borrowing": borrowing,
+            "request": self.request
+        }
+        serializer = self.get_serializer(
+            context=context
         )
-
-        if not money_paid:
-            return Response(
-                {
-                    "message":
-                        "The payment for this borrowing could not be found. "
-                        "Therefore, you cannot return a book that you have "
-                        "not yet paid for."
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if borrowing.actual_return_date:
-            raise ValidationError(
-                f"The book {borrowing.book} has already been "
-                f"returned. You can't return the same "
-                f"borrowing twice"
-            )
-
-        overdue = borrowing.check_overdue(request)
-
-        if overdue:
-            data = {
-                "message": (
-                    "Successfully retrieved the checkout "
-                    "session URL for processing overdue payment"
-                ),
-                "checkout_session_url": overdue.url,
-            }
-            try:
-                return Response(
-                    data,
-                    status=status.HTTP_302_FOUND
-                )
-            except AmountTooLargeError as e:
-                raise AmountTooLargeError
-            except Exception as e:
-                raise e
-
-        borrowing.make_today_actual_return_date()
-        borrowing.book.increase_book_inventory()
-
-        book = borrowing.book
-        return Response(
-            {
-                "message":
-                    f"The book {book.title} has been returned."
-            },
-            status=status.HTTP_200_OK
-        )
+        response_data = serializer.return_borrowing()
+        return Response(response_data, status=status.HTTP_200_OK)
 
     @extend_schema(
         parameters=[

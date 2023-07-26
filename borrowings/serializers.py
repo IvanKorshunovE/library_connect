@@ -3,6 +3,7 @@ from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from books.serializers import BookBorrowingSerializer
 from borrowings.models import Borrowing
@@ -56,7 +57,6 @@ class CreateBorrowingSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        print("Inside create")
         request = self.context.get("request")
         user = get_user_model().objects.get(
             pk=request.user.pk
@@ -88,5 +88,43 @@ class BorrowingSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class EmptySerializer(serializers.Serializer):
-    pass
+class ReturnBorrowingSerializer(serializers.Serializer):
+
+    def return_borrowing(self):
+        borrowing = self.context.get("borrowing")
+        request = self.context.get("request")
+        book = borrowing.book
+        money_to_pay = borrowing.calculate_borrowing_price()
+        money_paid = borrowing.payments.filter(
+            money_to_pay=money_to_pay,
+            status="PAID"
+        )
+        overdue = borrowing.check_overdue(request)
+
+        if borrowing.actual_return_date:
+            raise ValidationError(
+                f"The book {book} has already been returned."
+            )
+
+        if not money_paid:
+            raise ValidationError(
+                "The payment for this borrowing could not be found."
+            )
+
+        if overdue:
+            return {
+                "message":
+                    (
+                        "Successfully retrieved the checkout "
+                        "session URL for processing overdue payment"
+                    ),
+                "checkout_session_url": overdue.url,
+            }
+
+        borrowing.make_today_actual_return_date()
+        book.increase_book_inventory()
+
+        return {
+            "message":
+                f"The book {book.title} has been returned."
+        }
