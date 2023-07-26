@@ -1,9 +1,12 @@
 from datetime import datetime
 
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework import serializers
 
 from books.serializers import BookBorrowingSerializer
 from borrowings.models import Borrowing
+from payments.helper_borrowing_function import create_stripe_session
 from payments.serializers import PaymentSerializer
 
 
@@ -50,6 +53,32 @@ class CreateBorrowingSerializer(serializers.ModelSerializer):
                 f"You can't set the return date before today"
             )
         return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        print("Inside create")
+        request = self.context.get("request")
+        user = get_user_model().objects.get(
+            pk=request.user.pk
+        )
+        borrowing = Borrowing.objects.create(
+            user=user,
+            **validated_data
+        )
+        checkout_session = create_stripe_session(
+            borrowing, request=request
+        )
+        setattr(self, 'checkout_session_url', checkout_session.url)
+        return borrowing
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if hasattr(self, 'checkout_session_url'):
+            checkout_session_url = {
+                "checkout_session_url": self.checkout_session_url
+            }
+            representation.update(checkout_session_url)
+        return representation
 
 
 class BorrowingSerializer(serializers.ModelSerializer):

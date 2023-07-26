@@ -46,6 +46,7 @@ class BorrowingViewSet(
     )
     permission_classes = [IsAuthenticated]
 
+
     def get_queryset(self):
         queryset = self.queryset
         if not self.request.user.is_staff:
@@ -197,37 +198,6 @@ class BorrowingViewSet(
             },
             status=status.HTTP_200_OK
         )
-
-    @transaction.atomic
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        borrowing = serializer.instance
-        checkout_session = create_stripe_session(
-            borrowing, request=self.request
-        )
-        if isinstance(checkout_session, Session):
-            data = {
-                "message": "Checkout session URL retrieved successfully",
-                "checkout_session_url": checkout_session.url,
-            }
-            return Response(
-                data,
-                status=status.HTTP_302_FOUND,
-                headers=headers
-            )
-        return Response(
-            {
-                "message":
-                    "Checkout session is not created"
-            },
-            headers=headers
-        )
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
 
     @extend_schema(
         parameters=[
