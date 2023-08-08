@@ -10,7 +10,7 @@ The Library Service API is a comprehensive RESTful API designed for a library bo
 ### How to Run
 
 1. Clone the repository: `git clone https://github.com/IvanKorshunovE/library_connect`
-2. Change to the project directory (if you are not in the rood directory): `cd library_service_project`
+2. Change to the project directory (if you are not in the rood directory): `cd library_connect`
 3. Create a virtual environment: `python -m venv venv`
 4. Activate the virtual environment: `source venv/bin/activate`
 5. Install the required packages: `pip install -r requirements.txt`
