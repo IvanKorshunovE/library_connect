@@ -1,4 +1,4 @@
-# Library Service API
+# LibraryConnect
 
 The Library Service API is a comprehensive RESTful API designed for a library booking platform. It offers a wide range of endpoints, including user registration, authentication, profile management, borrowing creation and retrieval, stripe payments functionality, book and borrowing management (exclusive to administrators), and additional features.
 
